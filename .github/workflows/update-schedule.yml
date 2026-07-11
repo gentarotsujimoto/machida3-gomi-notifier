@@ -1,0 +1,34 @@
+name: Update Gomi Schedule
+
+on:
+  schedule:
+    # 毎年9月30日 15:00 UTC = 10月1日 00:00 JST
+    - cron: '0 15 30 9 *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate schedule
+        run: python generate_schedule.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add gomi_schedule.csv
+          git diff --cached --quiet || git commit -m "Update gomi schedule $(date +'%Y年度')"
+          git push
