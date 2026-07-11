@@ -29,14 +29,14 @@ def get_pdf_url() -> str:
     return f"{base}/{year}ippan03.pdf"
 
 
-def load_today_types() -> list:
-    today = today_jst().strftime("%Y-%m-%d")
+def load_types_for(target_date) -> list:
+    key = target_date.strftime("%Y-%m-%d")
     if not SCHEDULE_CSV.exists():
         print(f"エラー: {SCHEDULE_CSV} が見つかりません。", file=sys.stderr)
         return []
     with open(SCHEDULE_CSV, encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
-            if row["日付"] == today:
+            if row["日付"] == key:
                 return [t.strip() for t in row["ごみの種類"].split("、")]
     return []
 
@@ -61,14 +61,32 @@ def send_line_message(text: str) -> None:
 
 
 def main():
-    types = load_today_types()
-    if not types:
-        print("本日は収集なし。通知をスキップします。")
+    from datetime import timedelta
+    today = today_jst()
+    tomorrow = today + timedelta(days=1)
+
+    today_types = load_types_for(today)
+    tomorrow_types = load_types_for(tomorrow)
+
+    if not today_types and not tomorrow_types:
+        print("本日・明日ともに収集なし。通知をスキップします。")
         return
 
-    items = "\n".join(f"・{t}" for t in types)
+    sections = []
+    if today_types:
+        items = "\n".join(f"・{t}" for t in today_types)
+        sections.append(f"【今日のごみ収集】\n{items}")
+    else:
+        sections.append("【今日のごみ収集】\nなし")
+
+    if tomorrow_types:
+        items = "\n".join(f"・{t}" for t in tomorrow_types)
+        sections.append(f"【明日のごみ収集】\n{items}")
+    else:
+        sections.append("【明日のごみ収集】\nなし")
+
     pdf_url = get_pdf_url()
-    message = f"今日のごみ収集\n{items}\n\n年間収集カレンダー:\n{pdf_url}"
+    message = "\n\n".join(sections) + f"\n\n年間収集カレンダー:\n{pdf_url}"
 
     print(f"送信メッセージ:\n{message}")
     send_line_message(message)
